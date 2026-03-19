@@ -1,0 +1,43 @@
+# Dependencies
+node_modules/
+
+# Build output
+dist/
+
+# Environment
+.env
+.env.*
+
+# OS files
+.DS_Store
+Thumbs.db
+Desktop.ini
+
+# Editor
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Logs
+*.log
+npm-debug.log*
+
+# Claude Code config
+.claude/
+CLAUDE.md
+
+# Documentation (hosted separately)
+docs/
+
+# OpenWolf runtime (project-specific)
+.wolf/
+
+# Reference material (not needed in repo)
+reframe/
+
+# Misc
+openwolf-icon.zip
+openwolf-blueprint.md
+openwolf-readme-prompt.md
