@@ -1,6 +1,7 @@
 import * as fs from "node:fs";
 import * as path from "node:path";
 import { getWolfDir, ensureWolfDir, readJSON, readMarkdown, readStdin } from "./shared.js";
+import { Hippocampus } from "../hippocampus/index.js";
 
 interface BugEntry {
   id: string;
@@ -41,7 +42,12 @@ async function main(): Promise<void> {
   // 1. Cerebrum Do-Not-Repeat check
   checkCerebrum(wolfDir, allContent);
 
-  // 2. Bug log: search for similar past bugs when editing code
+  // 2. Hippocampus trauma check - warn about high-intensity trauma in the file
+  if (filePath) {
+    checkHippocampus(wolfDir, filePath);
+  }
+
+  // 3. Bug log: search for similar past bugs when editing code
   // This fires when Claude is about to edit a file — if the edit looks like a fix
   // (changing error handling, modifying catch blocks, etc.), check the bug log
   if (filePath && (oldStr || content)) {
@@ -151,6 +157,34 @@ function tokenize(text: string): Set<string> {
       .filter(w => w.length > 3 && !STOP_WORDS.has(w.toLowerCase()))
       .map(w => w.toLowerCase())
   );
+}
+
+function checkHippocampus(wolfDir: string, filePath: string): void {
+  // Skip if hippocampus.json doesn't exist yet
+  const hippocampusPath = path.join(wolfDir, "hippocampus.json");
+  if (!fs.existsSync(hippocampusPath)) return;
+
+  try {
+    const projectRoot = path.dirname(wolfDir);
+    const hippocampus = new Hippocampus(projectRoot);
+
+    // Get traumas for this file
+    const traumas = hippocampus.getTraumas(filePath);
+    const highIntensity = traumas.filter(t => t.outcome.intensity >= 0.6);
+
+    if (highIntensity.length > 0) {
+      process.stderr.write(
+        `\n⚠️ OpenWolf: ${highIntensity.length} high-intensity trauma(s) in ${path.basename(filePath)}\n`
+      );
+      for (const trauma of highIntensity.slice(0, 3)) {
+        process.stderr.write(
+          `   [${trauma.outcome.intensity.toFixed(1)}] "${trauma.outcome.reflection}"\n`
+        );
+      }
+    }
+  } catch {
+    // Hippocampus errors should be silent
+  }
 }
 
 main().catch(() => process.exit(0));

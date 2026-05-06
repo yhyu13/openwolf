@@ -122,3 +122,73 @@ export interface HippoStats {
   neutral_count: number;
   last_consolidation: string | null;
 }
+
+// ============================================================
+// Phase 2: Cue and Recall Types
+// ============================================================
+
+export type CueType = "location" | "question" | "state";
+
+export type LocationMatchMode = "exact" | "prefix" | "glob" | "parent" | "sibling";
+
+export interface LocationCue {
+  type: "location";
+  path: string | string[];
+  match_mode?: LocationMatchMode; // Default: "exact"
+}
+
+export interface QuestionCue {
+  type: "question";
+  query: string;
+  entities?: string[];
+  question_type?: QuestionType;
+}
+
+export interface StateCue {
+  type: "state";
+  goal?: string;
+  error?: {
+    type: string;
+    message: string;
+    file?: string;
+    line?: number;
+  };
+  turn_count: number;
+}
+
+export type Cue = LocationCue | QuestionCue | StateCue;
+
+export interface RecallRequest {
+  cue: Cue;
+  filters?: RecallFilters;
+  limit?: number; // Default: 5
+  offset?: number;
+}
+
+export interface MatchDetail {
+  event_id: string;
+  confidence: number;
+  match_reasons: string[];
+}
+
+export interface RecallResponse {
+  events: WolfEvent[];
+  total_matches: number;
+  confidence: number; // Average confidence of returned events
+  match_details: MatchDetail[];
+}
+
+// ============================================================
+// Phase 2: Cue Index Types
+// ============================================================
+
+export interface CueIndex {
+  version: 1;
+  last_updated: string;
+  location_index: Record<string, string[]>; // path -> event IDs (recency-sorted)
+  tag_index: Record<string, string[]>;
+  trauma_index: {
+    all_trauma_ids: string[]; // Sorted by intensity desc
+    by_path: Record<string, string[]>; // path -> trauma event IDs
+  };
+}

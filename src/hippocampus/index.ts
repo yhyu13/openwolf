@@ -8,7 +8,9 @@ import {
   HippocampusStore,
   HippoStats,
   RecallFilters,
-  Valence,
+  RecallRequest,
+  RecallResponse,
+  CueIndex,
 } from "./types.js";
 import {
   createEmptyStore,
@@ -18,17 +20,40 @@ import {
   getTraumaEventsForPath,
   filterEvents,
 } from "./event-store.js";
+import {
+  buildIndex,
+  loadIndex,
+  saveIndex,
+  addEventToIndex,
+  createEmptyIndex,
+  getCueIndexPath,
+  indexNeedsRebuild,
+} from "./cue-index.js";
+import { recallEvents } from "./cue-recall.js";
 
-export { WolfEvent, HippocampusStore, HippoStats, RecallFilters, Valence };
+export {
+  WolfEvent,
+  HippocampusStore,
+  HippoStats,
+  RecallFilters,
+  RecallRequest,
+  RecallResponse,
+  CueIndex,
+};
 
 export class Hippocampus {
   private projectRoot: string;
   private hippocampusPath: string;
+  private cueIndexPath: string;
   private store: HippocampusStore | null = null;
+  private cueIndex: CueIndex | null = null;
+  private eventCountSinceIndexPersist: number = 0;
+  private static readonly BATCH_SIZE = 10; // Persist index every 10 events
 
   constructor(projectRoot: string) {
     this.projectRoot = projectRoot;
     this.hippocampusPath = path.join(projectRoot, ".wolf", "hippocampus.json");
+    this.cueIndexPath = path.join(projectRoot, ".wolf", "cue-index.json");
   }
 
   private ensureLoaded(): HippocampusStore {
@@ -42,9 +67,32 @@ export class Hippocampus {
     return this.store;
   }
 
+  private ensureIndexLoaded(): CueIndex {
+    if (!this.cueIndex) {
+      const loadedIndex = loadIndex(this.cueIndexPath);
+
+      // Check if index needs rebuild
+      const store = this.ensureLoaded();
+      if (indexNeedsRebuild(loadedIndex, store.buffer.length)) {
+        this.cueIndex = buildIndex(store.buffer);
+        this.persistIndex();
+      } else {
+        this.cueIndex = loadedIndex!;
+      }
+    }
+    return this.cueIndex;
+  }
+
   private save(): void {
     if (this.store) {
       saveStore(this.hippocampusPath, this.store);
+    }
+  }
+
+  private persistIndex(): void {
+    if (this.cueIndex) {
+      saveIndex(this.cueIndexPath, this.cueIndex);
+      this.eventCountSinceIndexPersist = 0;
     }
   }
 
@@ -55,6 +103,7 @@ export class Hippocampus {
     eventData: Omit<WolfEvent, "id" | "consolidation">
   ): WolfEvent {
     const store = this.ensureLoaded();
+    const index = this.ensureIndexLoaded();
 
     const event: WolfEvent = {
       ...eventData,
@@ -72,6 +121,15 @@ export class Hippocampus {
 
     addEventToStore(store, event);
     this.save();
+
+    // Update cue index
+    addEventToIndex(index, event);
+    this.eventCountSinceIndexPersist++;
+
+    // Batch persist index every BATCH_SIZE events
+    if (this.eventCountSinceIndexPersist >= Hippocampus.BATCH_SIZE) {
+      this.persistIndex();
+    }
 
     return event;
   }
@@ -109,6 +167,17 @@ export class Hippocampus {
       return store.buffer;
     }
     return filterEvents(store, filters);
+  }
+
+  /**
+   * Recall events matching a cue using scoring algorithm.
+   * Uses pre-computed cue index for fast lookup.
+   */
+  recall(request: RecallRequest): RecallResponse {
+    const store = this.ensureLoaded();
+    const index = this.ensureIndexLoaded();
+
+    return recallEvents(store.buffer, request.cue, request, index);
   }
 
   /**

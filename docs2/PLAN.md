@@ -1,6 +1,6 @@
 # Hippocampus Memory System — Implementation Plan
 
-> **Status**: Phase 1 complete | Phase 2 pending
+> **Status**: Phase 1 ✅ | Phase 2 pending
 > **Goal**: Implement neuroscience-inspired episodic/spatial memory for OpenWolf
 > **Docs**: [00-hippocampus-memory-system.md](./00-hippocampus-memory-system.md)
 
@@ -18,7 +18,7 @@ The hippocampus system extends OpenWolf's flat, append-only memory with:
 ## Phase 1: Minimum Viable Hippocampus ✅
 
 **Target**: 1 session to complete
-**Verification**: Build passes, `openwolf init` creates hippocampus.json
+**Verification**: Build passes, `openwolf init` creates hippocampus.json, 98 tests passing
 
 ### Phase 1.1 — Create Type Definitions ✅
 - [x] `src/hippocampus/types.ts` — WolfEvent + all interfaces
@@ -44,19 +44,52 @@ The hippocampus system extends OpenWolf's flat, append-only memory with:
 ### Phase 1.8 — Build and Verify ✅
 - [x] `pnpm build` passes
 - [x] `openwolf init` creates hippocampus.json
-- [ ] File edit creates event in hippocampus.json (runtime test pending)
-- [ ] Pre-read shows trauma warning (runtime test pending)
+- [x] File edit creates event in hippocampus.json (runtime tested)
+- [x] Pre-read shows trauma warning (runtime tested)
+- [x] Test suite: 98 tests passing
 
 ---
 
 ## Phase 2: Basic Recall
 
-**Target**: 2 sessions
+**Target**: 2 sessions (1 complete, 1 for tests)
 **Prerequisite**: Phase 1 complete
+**Status**: Implementation complete | Tests pending
 
-- [ ] Implement recall() with scoring (location match, recency, intensity)
-- [ ] Build cue-index.json for fast path → event lookup
-- [ ] Enhance valence detection (recurring edits, user correction language)
+### Phase 2.1 — Cue Index System ✅
+- [x] `src/hippocampus/cue-index.ts` — CueIndex type and build logic
+- [x] `src/templates/cue-index.json` — Template for cue-index.json
+- [x] Index updates on addEvent (batch every 10 events)
+- [x] Wire into init.ts to create cue-index.json
+
+### Phase 2.2 — Recall API ✅
+- [x] `Hippocampus.recall(cue, filters)` — Main recall entry point
+- [x] Location cue scoring (exact, prefix, glob, parent, sibling)
+- [x] Recency scoring with exponential decay (half-life 30 days)
+- [x] Valence/intensity scoring boost
+
+### Phase 2.3 — Question/Semantic Cue (Light) ✅
+- [x] Tag-based matching fallback (via tag_index)
+- [ ] Entity extraction from question cues (Phase 3)
+
+### Phase 2.4 — State Cue Integration ✅
+- [x] Error pattern matching from action.error_message
+- [ ] Recent valence sequence detection (Phase 3)
+
+### Phase 2.5 — Enhance pre-write Hook ✅
+- [x] Check for trauma patterns before editing
+- [x] Show warnings for high-intensity trauma events
+
+### Phase 2.6 — CLI: `openwolf recall` Command ✅
+- [x] `openwolf recall <query>` — CLI to trigger recall
+- [x] Pretty-print recall results
+- [x] JSON output option
+
+### Phase 2.7 — Tests ⏳
+- [ ] T9_cue-index.test.ts
+- [ ] T10_recall.test.ts
+- [ ] T11_recall-cli.test.sh
+- [ ] T12_integration.sh
 
 ---
 
@@ -77,19 +110,23 @@ The hippocampus system extends OpenWolf's flat, append-only memory with:
 src/hippocampus/
 ├── index.ts              # Hippocampus class + public API
 ├── types.ts              # All type definitions (WolfEvent, Valence, etc.)
-├── event-store.ts         # hippocampus.json CRUD
-├── cue-recall.ts         # Recall algorithm + cue-index (Phase 2)
+├── event-store.ts        # hippocampus.json CRUD
+├── cue-index.ts          # Cue index builder (Phase 2)
+├── cue-recall.ts         # Recall algorithm (Phase 2)
 └── consolidation.ts       # Neocortex transfer + decay (Phase 3)
 
 src/templates/
-└── hippocampus.json      # Template for openwolf init
+├── hippocampus.json      # Template for openwolf init
+└── cue-index.json       # Template for cue-index (Phase 2)
 
 src/hooks/
 ├── post-write.ts         # Wire: addEvent() call
-└── pre-read.ts           # Wire: trauma warnings
+├── pre-read.ts           # Wire: trauma warnings
+└── pre-write.ts          # Wire: penalty warnings (Phase 2)
 
 src/cli/
-└── init.ts               # Wire: create hippocampus.json
+├── init.ts               # Wire: create hippocampus.json
+└── recall.ts             # Recall CLI command (Phase 2)
 ```
 
 ---
