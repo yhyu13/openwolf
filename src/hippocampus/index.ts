@@ -3,7 +3,7 @@
 import * as fs from "node:fs";
 import * as path from "node:path";
 import * as crypto from "node:crypto";
-import {
+import type {
   WolfEvent,
   HippocampusStore,
   HippoStats,
@@ -31,7 +31,7 @@ import {
 } from "./cue-index.js";
 import { recallEvents } from "./cue-recall.js";
 
-export {
+export type {
   WolfEvent,
   HippocampusStore,
   HippoStats,
