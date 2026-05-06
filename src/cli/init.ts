@@ -44,6 +44,7 @@ const CREATE_IF_MISSING = [
   "suggestions.json",
   "hippocampus.json",
   "cue-index.json",
+  "neocortex.json",
 ];
 
 // Use $CLAUDE_PROJECT_DIR so hooks resolve correctly even if CWD changes during a session
@@ -189,6 +190,14 @@ export async function initCommand(): Promise<void> {
   if (!hippo.created_at) { hippo.created_at = now; }
   if (!hippo.last_updated) { hippo.last_updated = now; }
   writeJSON(hippoPath, hippo);
+
+  // --- Neocortex: fill project_root, created_at, last_updated ---
+  const neocortexPath = path.join(wolfDir, "neocortex.json");
+  const neocortex = readJSON<Record<string, unknown>>(neocortexPath, {});
+  if (!neocortex.project_root) { neocortex.project_root = projectRoot; }
+  if (!neocortex.created_at) { neocortex.created_at = now; }
+  if (!neocortex.last_updated) { neocortex.last_updated = now; }
+  writeJSON(neocortexPath, neocortex);
 
   // --- Hook scripts: always update (bug fixes, new features) ---
   copyHookScripts(wolfDir);

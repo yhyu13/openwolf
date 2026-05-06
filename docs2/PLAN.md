@@ -1,6 +1,6 @@
 # Hippocampus Memory System — Implementation Plan
 
-> **Status**: Phase 1 ✅ | Phase 2 pending
+> **Status**: Phase 1 ✅ | Phase 2 ✅ | Phase 3 ✅
 > **Goal**: Implement neuroscience-inspired episodic/spatial memory for OpenWolf
 > **Docs**: [00-hippocampus-memory-system.md](./00-hippocampus-memory-system.md)
 
@@ -93,14 +93,33 @@ The hippocampus system extends OpenWolf's flat, append-only memory with:
 
 ---
 
-## Phase 3: Consolidation
+## Phase 3: Consolidation ✅
 
 **Target**: 3-4 sessions
 **Prerequisite**: Phase 2 complete
+**Status**: Implementation complete | Tests passing (36 assertions)
 
-- [ ] Create neocortex.json store
-- [ ] Add decay logic (weekly decay check, trauma never decays)
-- [ ] Wire daemon for off-peak consolidation
+### Phase 3.1 — Neocortex Store ✅
+- [x] `src/hippocampus/consolidation.ts` — Neocortex CRUD and decay logic
+- [x] `src/templates/neocortex.json` — Template for neocortex store
+- [x] Hippocampus.getLongTermMemory(), getNeocortexStats(), neocortexExists()
+
+### Phase 3.2 — Decay Logic ✅
+- [x] Linear decay: 5% per week for neutral/reward/penalty
+- [x] Trauma never decays (decay_rate = 0)
+- [x] calculateConsolidationScore() — intensity + valence + recency
+- [x] determineConsolidationAction() — promote/decay/forget/keep
+
+### Phase 3.3 — Daemon Wiring ✅
+- [x] `cron-engine.ts` — Added consolidate_hippocampus action type
+- [x] `cron-manifest.json` — hippocampus-consolidation task (daily 3 AM)
+- [x] `init.ts` — Creates neocortex.json on init
+
+### Phase 3.4 — Tests ✅
+- [x] T13_consolidation.test.ts (6 tests)
+- [x] T14_decay.test.ts (10 tests)
+- [x] T15_neocortex.test.ts (9 tests)
+- [x] T16_integration.test.sh (12 tests)
 
 ---
 

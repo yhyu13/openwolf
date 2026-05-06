@@ -30,6 +30,17 @@ import {
   indexNeedsRebuild,
 } from "./cue-index.js";
 import { recallEvents } from "./cue-recall.js";
+import {
+  createEmptyNeocortex,
+  loadNeocortex,
+  saveNeocortex,
+  runConsolidation,
+  getNeocortexEvents,
+  type NeocortexStore,
+  type ConsolidationReport,
+} from "./consolidation.js";
+
+export type { NeocortexStore, ConsolidationReport };
 
 export type {
   WolfEvent,
@@ -45,8 +56,10 @@ export class Hippocampus {
   private projectRoot: string;
   private hippocampusPath: string;
   private cueIndexPath: string;
+  private neocortexPath: string;
   private store: HippocampusStore | null = null;
   private cueIndex: CueIndex | null = null;
+  private neocortex: NeocortexStore | null = null;
   private eventCountSinceIndexPersist: number = 0;
   private static readonly BATCH_SIZE = 10; // Persist index every 10 events
 
@@ -54,6 +67,7 @@ export class Hippocampus {
     this.projectRoot = projectRoot;
     this.hippocampusPath = path.join(projectRoot, ".wolf", "hippocampus.json");
     this.cueIndexPath = path.join(projectRoot, ".wolf", "cue-index.json");
+    this.neocortexPath = path.join(projectRoot, ".wolf", "neocortex.json");
   }
 
   private ensureLoaded(): HippocampusStore {
@@ -81,6 +95,25 @@ export class Hippocampus {
       }
     }
     return this.cueIndex;
+  }
+
+  private ensureNeocortexLoaded(): NeocortexStore {
+    if (!this.neocortex) {
+      const loaded = loadNeocortex(this.neocortexPath);
+      if (loaded) {
+        this.neocortex = loaded;
+      } else {
+        this.neocortex = createEmptyNeocortex(this.projectRoot);
+        saveNeocortex(this.neocortexPath, this.neocortex);
+      }
+    }
+    return this.neocortex;
+  }
+
+  private persistNeocortex(): void {
+    if (this.neocortex) {
+      saveNeocortex(this.neocortexPath, this.neocortex);
+    }
   }
 
   private save(): void {
@@ -181,10 +214,60 @@ export class Hippocampus {
   }
 
   /**
+   * Run consolidation pass to transfer events from short-term to long-term memory.
+   * Returns a report of actions taken.
+   */
+  consolidate(options?: { maxToPromote?: number }): ConsolidationReport {
+    const store = this.ensureLoaded();
+    const neocortex = this.ensureNeocortexLoaded();
+
+    const report = runConsolidation(store, neocortex, {
+      maxToPromote: options?.maxToPromote ?? 50,
+    });
+
+    this.save();
+    this.persistNeocortex();
+
+    return report;
+  }
+
+  /**
+   * Get events from long-term (neocortex) memory.
+   */
+  getLongTermMemory(filters?: {
+    valence?: string[];
+    minIntensity?: number;
+    limit?: number;
+  }): WolfEvent[] {
+    const neocortex = this.ensureNeocortexLoaded();
+    return getNeocortexEvents(neocortex, filters);
+  }
+
+  /**
+   * Get neocortex store statistics.
+   */
+  getNeocortexStats(): { total_consolidated: number; by_valence: Record<string, number>; last_consolidation: string | null } {
+    const neocortex = this.ensureNeocortexLoaded();
+    return {
+      total_consolidated: neocortex.stats.total_consolidated,
+      by_valence: { ...neocortex.stats.by_valence },
+      last_consolidation: neocortex.stats.last_consolidation,
+    };
+  }
+
+  /**
+   * Check if neocortex store exists.
+   */
+  neocortexExists(): boolean {
+    return fs.existsSync(this.neocortexPath);
+  }
+
+  /**
    * Get statistics about the hippocampus store.
    */
   getStats(): HippoStats {
     const store = this.ensureLoaded();
+    const neocortex = this.ensureNeocortexLoaded();
     return {
       total_events: store.stats.total_events,
       buffer_size: store.buffer.length,
@@ -192,7 +275,7 @@ export class Hippocampus {
       reward_count: store.stats.reward_count,
       penalty_count: store.stats.penalty_count,
       neutral_count: store.stats.neutral_count,
-      last_consolidation: null, // TODO: track this
+      last_consolidation: neocortex.stats.last_consolidation,
     };
   }
 
