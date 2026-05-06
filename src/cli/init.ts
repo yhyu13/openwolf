@@ -180,6 +180,15 @@ export async function initCommand(): Promise<void> {
     writeJSON(ledgerPath, ledger);
   }
 
+  // --- Hippocampus: fill project_root, created_at, last_updated ---
+  const hippoPath = path.join(wolfDir, "hippocampus.json");
+  const hippo = readJSON<Record<string, unknown>>(hippoPath, {});
+  const now = new Date().toISOString();
+  if (!hippo.project_root) { hippo.project_root = projectRoot; }
+  if (!hippo.created_at) { hippo.created_at = now; }
+  if (!hippo.last_updated) { hippo.last_updated = now; }
+  writeJSON(hippoPath, hippo);
+
   // --- Hook scripts: always update (bug fixes, new features) ---
   copyHookScripts(wolfDir);
 

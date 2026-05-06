@@ -4,6 +4,9 @@ import * as fs from "node:fs";
 import * as path from "node:path";
 import { HippocampusStore, WolfEvent, Valence } from "./types.js";
 
+// Re-export types for external use
+export type { HippocampusStore, WolfEvent, Valence };
+
 const DEFAULT_CONFIG = {
   max_size_bytes: 5_000_000,
   retention_days: 7,
