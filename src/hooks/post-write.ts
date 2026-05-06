@@ -5,6 +5,7 @@ import {
   getWolfDir, ensureWolfDir, readJSON, writeJSON, readMarkdown, parseAnatomy, serializeAnatomy,
   extractDescription, estimateTokens, appendMarkdown, timeShort, readStdin, normalizePath
 } from "./shared.js";
+import { Hippocampus } from "../hippocampus/index.js";
 
 interface SessionData {
   files_written: Array<{ file: string; action: string; tokens: number; at: string }>;
@@ -177,6 +178,69 @@ async function main(): Promise<void> {
       autoDetectBugFix(wolfDir, absolutePath, projectRoot, oldStr, newStr);
     }
   } catch {}
+
+  // 5. Capture hippocampus event
+  try {
+    const hippocampus = new Hippocampus(projectRoot);
+
+    // Determine valence from context
+    let valence: "reward" | "neutral" | "penalty" | "trauma" = "neutral";
+    let intensity = 0.5;
+    let reflection = "";
+
+    const action = toolName === "Write" ? "write" : "edit";
+    const relFile = normalizePath(path.relative(projectRoot, absolutePath));
+
+    // Check edit count for recurring trauma
+    const session = readJSON<SessionData>(sessionFile, { files_written: [], edit_counts: {} });
+    const editKey = normalizePath(path.relative(projectRoot, absolutePath));
+    const editCount = session.edit_counts?.[editKey] || 0;
+
+    if (editCount >= 3) {
+      valence = "trauma";
+      intensity = Math.min(0.9, 0.6 + editCount * 0.1);
+      reflection = `File edited ${editCount} times. Possible issue or bug fix.`;
+    } else if (editCount >= 1) {
+      valence = "neutral";
+      intensity = 0.3;
+      reflection = `File edited ${editCount + 1} time(s).`;
+    } else {
+      reflection = `New file created: ${relFile}`;
+    }
+
+    hippocampus.addEvent({
+      version: 1,
+      timestamp: new Date().toISOString(),
+      session_id: process.env.CLAUDE_SESSION_ID || "unknown",
+      context: {
+        project_root: projectRoot,
+        files_involved: [absolutePath],
+        cwd_at_time: projectRoot,
+        spatial_path: normalizePath(path.dirname(relFile)) || "./",
+        spatial_depth: relFile.split("/").length - 1,
+        session_start: process.env.CLAUDE_SESSION_START || new Date().toISOString(),
+        turn_in_session: 0,
+        current_goal: undefined,
+      },
+      action: {
+        type: toolName === "Write" ? "write" : "edit",
+        description: `${toolName === "Write" ? "Created" : "Edited"} ${relFile}`,
+        tokens_spent: estimateTokens(input.tool_input?.content || newStr || "", "code"),
+        files_modified: [absolutePath],
+        succeeded: true,
+      },
+      outcome: {
+        valence,
+        intensity,
+        reflection,
+        is_recurring: editCount >= 3,
+      },
+      source: "hook",
+      tags: ["file-write", action, path.extname(absolutePath).slice(1) || "unknown"],
+    });
+  } catch (e) {
+    // Fail silently - hippocampus should not break existing functionality
+  }
 
   process.exit(0);
 }

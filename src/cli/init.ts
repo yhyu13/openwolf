@@ -42,6 +42,7 @@ const CREATE_IF_MISSING = [
   "cron-state.json",
   "designqc-report.json",
   "suggestions.json",
+  "hippocampus.json",
 ];
 
 // Use $CLAUDE_PROJECT_DIR so hooks resolve correctly even if CWD changes during a session

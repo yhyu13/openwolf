@@ -3,6 +3,7 @@ import {
   getWolfDir, ensureWolfDir, readJSON, writeJSON, readMarkdown, parseAnatomy,
   estimateTokens, readStdin, normalizePath
 } from "./shared.js";
+import { Hippocampus } from "../hippocampus/index.js";
 
 interface SessionData {
   session_id: string;
@@ -86,6 +87,33 @@ async function main(): Promise<void> {
     session.anatomy_hits++;
   } else {
     session.anatomy_misses++;
+  }
+
+  // Check hippocampus for trauma warnings
+  try {
+    const projectRoot = process.env.CLAUDE_PROJECT_DIR || process.cwd();
+    const hippocampus = new Hippocampus(projectRoot);
+
+    if (hippocampus.exists()) {
+      const absolutePath = path.isAbsolute(filePath)
+        ? filePath
+        : path.join(projectRoot, filePath);
+      const traumas = hippocampus.getTraumas(absolutePath);
+
+      if (traumas.length > 0) {
+        const warnings = traumas
+          .filter((t) => t.outcome.intensity >= 0.6)
+          .slice(0, 3)
+          .map((t) => `⚠️ ${path.basename(absolutePath)}: ${t.outcome.reflection} (intensity: ${t.outcome.intensity})`)
+          .join("\n");
+
+        if (warnings) {
+          process.stderr.write(`\n${warnings}\n`);
+        }
+      }
+    }
+  } catch {
+    // Fail silently - hippocampus should not break existing functionality
   }
 
   // Record initial read entry (tokens will be updated in post-read)
