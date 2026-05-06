@@ -54,7 +54,7 @@ The hippocampus system extends OpenWolf's flat, append-only memory with:
 
 **Target**: 2 sessions (1 complete, 1 for tests)
 **Prerequisite**: Phase 1 complete
-**Status**: Implementation complete | Tests pending
+**Status**: Implementation complete | Tests passing (109 assertions)
 
 ### Phase 2.1 — Cue Index System ✅
 - [x] `src/hippocampus/cue-index.ts` — CueIndex type and build logic
@@ -70,11 +70,11 @@ The hippocampus system extends OpenWolf's flat, append-only memory with:
 
 ### Phase 2.3 — Question/Semantic Cue (Light) ✅
 - [x] Tag-based matching fallback (via tag_index)
-- [ ] Entity extraction from question cues (Phase 3)
+- [ ] Entity extraction from question cues — **Deferred** (QuestionCue.entities exists as optional field; caller must populate manually)
 
 ### Phase 2.4 — State Cue Integration ✅
 - [x] Error pattern matching from action.error_message
-- [ ] Recent valence sequence detection (Phase 3)
+- [ ] Recent valence sequence detection — **Deferred** (StateCue uses error pattern matching only)
 
 ### Phase 2.5 — Enhance pre-write Hook ✅
 - [x] Check for trauma patterns before editing
@@ -85,11 +85,11 @@ The hippocampus system extends OpenWolf's flat, append-only memory with:
 - [x] Pretty-print recall results
 - [x] JSON output option
 
-### Phase 2.7 — Tests ⏳
-- [ ] T9_cue-index.test.ts
-- [ ] T10_recall.test.ts
-- [ ] T11_recall-cli.test.sh
-- [ ] T12_integration.sh
+### Phase 2.7 — Tests ✅
+- [x] T9_cue-index.test.ts (37 assertions)
+- [x] T10_recall.test.ts (57 assertions)
+- [x] T11_recall-cli.test.sh (9 assertions)
+- [x] T12_integration.sh (6 assertions)
 
 ---
 
@@ -97,7 +97,7 @@ The hippocampus system extends OpenWolf's flat, append-only memory with:
 
 **Target**: 3-4 sessions
 **Prerequisite**: Phase 2 complete
-**Status**: Implementation complete | Tests passing (36 assertions)
+**Status**: Implementation complete | Tests passing (37 assertions)
 
 ### Phase 3.1 — Neocortex Store ✅
 - [x] `src/hippocampus/consolidation.ts` — Neocortex CRUD and decay logic
@@ -136,7 +136,8 @@ src/hippocampus/
 
 src/templates/
 ├── hippocampus.json      # Template for openwolf init
-└── cue-index.json       # Template for cue-index (Phase 2)
+├── cue-index.json        # Template for cue-index (Phase 2)
+└── neocortex.json        # Template for neocortex (Phase 3)
 
 src/hooks/
 ├── post-write.ts         # Wire: addEvent() call

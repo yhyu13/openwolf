@@ -40,7 +40,14 @@ Across 20 projects, 132+ sessions: average token reduction of 65.8%, with 71% of
 ## Quick Start
 
 ```bash
+# Install from npm
 npm install -g openwolf
+
+# Or install locally from source
+git clone https://github.com/cytostack/openwolf.git
+cd openwolf
+./scripts/install.sh   # Installs local version globally
+
 cd your-project
 openwolf init
 ```
@@ -62,6 +69,9 @@ That's it. Use `claude` normally. OpenWolf is watching.
 | `config.json` | Configuration with sensible defaults |
 | `identity.md` | Agent persona for this project |
 | `OPENWOLF.md` | Instructions Claude follows every session |
+| `hippocampus.json` | Episodic event memory (writes, edits, reads) |
+| `cue-index.json` | Fast lookup index for recall |
+| `neocortex.json` | Long-term memory with decay |
 
 ## How It Works
 
@@ -86,6 +96,49 @@ Claude finishes
     ↓
 OpenWolf: updates anatomy.md, appends to memory.md, updates token ledger
 ```
+
+## Hippocampus Memory System
+
+OpenWolf's hippocampus provides **episodic memory** — tracking what happened, when, and where in your project. It captures file writes, edits, and reads as events with context and outcome.
+
+### How It Works
+
+Every file operation is captured as an event with:
+- **Context**: file path, session, timestamps, spatial location
+- **Action**: write/edit/delete with description
+- **Outcome**: valence (trauma/neutral/reward/penalty), intensity, reflection
+
+Events are stored in `hippocampus.json` and indexed in `cue-index.json` for fast recall.
+
+### Valence Detection
+
+- **Trauma** (3+ edits to same file): Flagged as high-intensity — something needed fixing
+- **Neutral** (new file or 1-2 edits): Normal work activity
+- **Reward/Penalty**: Future hooks will track successful vs failed actions
+
+### Recall
+
+Query past events by location or context:
+
+```bash
+# Recall all events for a file
+openwolf recall /path/to/file.ts
+
+# Recall with prefix match (all files under directory)
+openwolf recall --match-mode prefix /path/to/src/
+
+# Recall only trauma events
+openwolf recall --type state --error "TypeError" /path/to/src/
+
+# JSON output
+openwolf recall --json /path/to/file.ts
+```
+
+### Consolidation (Long-term Memory)
+
+High-value events are promoted to `neocortex.json` (long-term storage). Low-value events decay over time (5% per week). Trauma events never decay.
+
+The daemon runs consolidation daily at 3 AM to transfer important events from short-term (hippocampus) to long-term (neocortex) storage.
 
 ## The .wolf/ Files
 
@@ -182,6 +235,7 @@ openwolf init              Initialize .wolf/ and register hooks
 openwolf status            Show health, stats, file integrity
 openwolf scan              Refresh the project structure map
 openwolf scan --check      Verify anatomy matches filesystem (exits 1 if stale)
+openwolf recall <path>    Recall events from hippocampus memory
 openwolf dashboard         Open the real-time web dashboard
 openwolf daemon start      Start background task scheduler
 openwolf daemon stop       Stop the scheduler
