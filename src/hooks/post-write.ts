@@ -179,7 +179,7 @@ async function main(): Promise<void> {
     }
   } catch {}
 
-  // 5. Capture hippocampus event
+  // 5. Capture hippocampus event and surface related past learnings
   try {
     const hippocampus = new Hippocampus(projectRoot);
 
@@ -208,13 +208,43 @@ async function main(): Promise<void> {
       reflection = `New file created: ${relFile}`;
     }
 
+    // Surface related past learnings if this is a multi-edit (potential bug fix attempt)
+    if (hippocampus.exists() && editCount >= 2) {
+      const relatedResponse = hippocampus.recall({
+        cue: {
+          type: "location",
+          path: relFile,
+          match_mode: "parent",
+        },
+        filters: {
+          valence: ["trauma", "reward"],
+          min_intensity: 0.5,
+        },
+        limit: 3,
+      });
+
+      // Filter out the current event if it was already stored
+      const pastLearnings = relatedResponse.events.filter((e) => e.id && !e.id.startsWith("evt-"));
+
+      if (pastLearnings.length > 0) {
+        const learningLines = pastLearnings
+          .slice(0, 2)
+          .map((e) => {
+            const icon = e.outcome.valence === "reward" ? "✅" : "⚠️";
+            return `   ${icon} [past ${e.outcome.valence}] ${e.outcome.reflection}`;
+          })
+          .join("\n");
+        process.stderr.write(`\n🧠 OpenWolf hippocampus: Related past learnings for ${path.basename(absolutePath)}:\n${learningLines}\n`);
+      }
+    }
+
     hippocampus.addEvent({
       version: 1,
       timestamp: new Date().toISOString(),
       session_id: process.env.CLAUDE_SESSION_ID || "unknown",
       context: {
         project_root: projectRoot,
-        files_involved: [absolutePath],
+        files_involved: [relFile],
         cwd_at_time: projectRoot,
         spatial_path: normalizePath(path.dirname(relFile)) || "./",
         spatial_depth: relFile.split("/").length - 1,

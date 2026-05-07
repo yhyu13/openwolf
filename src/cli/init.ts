@@ -482,6 +482,19 @@ function copyHookScripts(wolfDir: string): void {
     console.warn("  ⚠ Could not find compiled hook scripts. Run 'pnpm build:hooks' and re-run init.");
   }
 
+  // Copy hippocampus module to .wolf/hippocampus/ (hooks import it as ../hippocampus/index.js)
+  const hippocampusSrc = path.resolve(__dirname, "..", "hippocampus");
+  const hippocampusDest = path.join(wolfDir, "hippocampus");
+  if (fs.existsSync(hippocampusSrc) && fs.existsSync(path.join(hippocampusSrc, "index.js"))) {
+    ensureDir(hippocampusDest);
+    for (const file of fs.readdirSync(hippocampusSrc)) {
+      if ((file.endsWith(".js") && !file.endsWith(".js.map")) || file === "types.js") {
+        fs.copyFileSync(path.join(hippocampusSrc, file), path.join(hippocampusDest, file));
+      }
+    }
+    console.log("  ✓ Hippocampus episodic memory module installed");
+  }
+
   // Always write a package.json with type:module so ESM hooks work in any project
   const hooksPkgPath = path.join(hooksDir, "package.json");
   fs.writeFileSync(hooksPkgPath, JSON.stringify({ type: "module" }, null, 2) + "\n", "utf-8");

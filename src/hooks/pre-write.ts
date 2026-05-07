@@ -1,6 +1,6 @@
 import * as fs from "node:fs";
 import * as path from "node:path";
-import { getWolfDir, ensureWolfDir, readJSON, readMarkdown, readStdin } from "./shared.js";
+import { getWolfDir, ensureWolfDir, readJSON, readMarkdown, readStdin, normalizePath } from "./shared.js";
 import { Hippocampus } from "../hippocampus/index.js";
 
 interface BugEntry {
@@ -168,17 +168,48 @@ function checkHippocampus(wolfDir: string, filePath: string): void {
     const projectRoot = path.dirname(wolfDir);
     const hippocampus = new Hippocampus(projectRoot);
 
-    // Get traumas for this file
-    const traumas = hippocampus.getTraumas(filePath);
-    const highIntensity = traumas.filter(t => t.outcome.intensity >= 0.6);
+    if (!hippocampus.exists()) return;
+
+    // Get exact file traumas (convert to relative to match stored files_involved)
+    const absolutePath = path.isAbsolute(filePath) ? filePath : path.join(projectRoot, filePath);
+    const relativeFile = normalizePath(path.relative(projectRoot, absolutePath));
+    const exactTraumas = hippocampus.getTraumas(relativeFile);
+    const highIntensityExact = exactTraumas.filter(t => t.outcome.intensity >= 0.6);
+
+    // Also recall related traumas using parent directory matching
+    const relatedResponse = hippocampus.recall({
+      cue: {
+        type: "location",
+        path: relativeFile,
+        match_mode: "parent",
+      },
+      filters: {
+        valence: ["trauma"],
+        min_intensity: 0.5,
+      },
+      limit: 5,
+    });
+
+    // Combine exact + related, dedupe
+    const allTraumas = [...exactTraumas];
+    for (const event of relatedResponse.events) {
+      if (!allTraumas.some((t) => t.id === event.id)) {
+        allTraumas.push(event);
+      }
+    }
+
+    const highIntensity = allTraumas.filter(t => t.outcome.intensity >= 0.6);
 
     if (highIntensity.length > 0) {
+      const fileLabel = highIntensityExact.length > 0 ? path.basename(filePath) : `related in ${path.dirname(absolutePath).split("/").pop()}`;
       process.stderr.write(
-        `\n⚠️ OpenWolf: ${highIntensity.length} high-intensity trauma(s) in ${path.basename(filePath)}\n`
+        `\n🧠 OpenWolf hippocampus: ${highIntensity.length} trauma(s) for ${fileLabel}\n`
       );
       for (const trauma of highIntensity.slice(0, 3)) {
+        const isExact = highIntensityExact.some((e) => e.id === trauma.id);
+        const prefix = isExact ? "⚠️" : "📌";
         process.stderr.write(
-          `   [${trauma.outcome.intensity.toFixed(1)}] "${trauma.outcome.reflection}"\n`
+          `   ${prefix} [${trauma.outcome.intensity.toFixed(1)}] "${trauma.outcome.reflection}"\n`
         );
       }
     }

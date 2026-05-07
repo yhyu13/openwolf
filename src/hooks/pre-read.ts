@@ -90,6 +90,7 @@ async function main(): Promise<void> {
   }
 
   // Check hippocampus for trauma warnings
+  // Use context-aware recall to surface traumas from related files/directories, not just exact matches
   try {
     const projectRoot = process.env.CLAUDE_PROJECT_DIR || process.cwd();
     const hippocampus = new Hippocampus(projectRoot);
@@ -98,17 +99,53 @@ async function main(): Promise<void> {
       const absolutePath = path.isAbsolute(filePath)
         ? filePath
         : path.join(projectRoot, filePath);
-      const traumas = hippocampus.getTraumas(absolutePath);
 
-      if (traumas.length > 0) {
-        const warnings = traumas
+      // Convert to relative path to match how events store files_involved
+      const relativeFile = normalizePath(path.relative(projectRoot, absolutePath));
+
+      // First check exact file match
+      const exactTraumas = hippocampus.getTraumas(relativeFile);
+      const highIntensityExact = exactTraumas.filter((t) => t.outcome.intensity >= 0.6);
+
+      // Also recall related traumas using parent directory and prefix matching
+      // This surfaces traumas from sibling/parent files when working in a context
+      const relatedResponse = hippocampus.recall({
+        cue: {
+          type: "location",
+          path: relativeFile,
+          match_mode: "parent",
+        },
+        filters: {
+          valence: ["trauma"],
+          min_intensity: 0.5,
+        },
+        limit: 5,
+      });
+
+      // Dedupe: combine exact + related, prefer exact matches
+      const allTraumas = [...exactTraumas];
+      for (const event of relatedResponse.events) {
+        if (!allTraumas.some((t) => t.id === event.id)) {
+          allTraumas.push(event);
+        }
+      }
+
+      if (allTraumas.length > 0) {
+        const highIntensity = allTraumas
           .filter((t) => t.outcome.intensity >= 0.6)
-          .slice(0, 3)
-          .map((t) => `⚠️ ${path.basename(absolutePath)}: ${t.outcome.reflection} (intensity: ${t.outcome.intensity})`)
-          .join("\n");
+          .slice(0, 5);
 
-        if (warnings) {
-          process.stderr.write(`\n${warnings}\n`);
+        if (highIntensity.length > 0) {
+          const fileLabel = highIntensityExact.length > 0 ? path.basename(absolutePath) : `related in ${path.dirname(absolutePath).split("/").pop()}`;
+          const warnings = highIntensity
+            .map((t) => {
+              const isExact = highIntensityExact.some((e) => e.id === t.id);
+              const prefix = isExact ? "⚠️" : "📌";
+              return `${prefix} [${t.outcome.intensity.toFixed(1)}] ${t.outcome.reflection}`;
+            })
+            .join("\n");
+
+          process.stderr.write(`\n🧠 OpenWolf hippocampus: ${warnings}\n`);
         }
       }
     }
